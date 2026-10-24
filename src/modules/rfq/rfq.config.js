@@ -1,16 +1,13 @@
 /**
  * RFQ MODULE — sidebar navigation.
  * Add a new screen: 1) create the page in ./pages  2) add it here  3) add a <Route> in RFQModule.jsx
+ * `match` keeps "RFQ Dashboard" highlighted on event detail pages.
  */
-import { LayoutDashboard, ListChecks, FilePlus2, Inbox, Columns3, Users } from 'lucide-react';
+import { FilePlus2, LayoutDashboard } from 'lucide-react';
 
 export const BASE = '/rfq';
 
 export const RFQ_NAV = [
-  { label: 'Overview', path: BASE, icon: LayoutDashboard, end: true },
-  { label: 'All RFQs', path: `${BASE}/list`, icon: ListChecks },
+  { label: 'RFQ Dashboard', path: BASE, icon: LayoutDashboard, match: (p) => p === BASE || p.startsWith(`${BASE}/events`) },
   { label: 'Create RFQ', path: `${BASE}/create`, icon: FilePlus2 },
-  { label: 'Vendor Responses', path: `${BASE}/responses`, icon: Inbox },
-  { label: 'Quote Comparison', path: `${BASE}/comparison`, icon: Columns3 },
-  { label: 'Vendors', path: `${BASE}/vendors`, icon: Users },
 ];

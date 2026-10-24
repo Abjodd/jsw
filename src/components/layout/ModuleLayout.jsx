@@ -1,4 +1,4 @@
-import { NavLink, Link, Outlet } from 'react-router-dom';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import JswLogo from '@/components/brand/JswLogo';
 import { MODULES } from '@/config/modules';
@@ -12,30 +12,30 @@ const sideLabel = {
   textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)',
 };
 
-function SideNavLink({ to, end, icon: Icon, children }) {
+function SideNavLink({ to, end, match, icon: Icon, children }) {
   const [hovered, hoverProps] = useHover();
+  const { pathname } = useLocation();
+  const path = pathname.replace(/\/+$/, '') || '/';
+  // `match` (optional, from <module>.config.js) lets a menu item stay active on sub-routes
+  const isActive = match ? match(path) : end ? path === to : path === to || path.startsWith(`${to}/`);
   return (
-    <NavLink
+    <Link
       to={to}
-      end={end}
       {...hoverProps}
-      style={({ isActive }) => ({
+      aria-current={isActive ? 'page' : undefined}
+      style={{
         ...text.nav, position: 'relative', display: 'flex', alignItems: 'center', gap: 12,
         padding: '10px 12px', borderRadius: 8, transition,
         color: isActive || hovered ? colors.white : 'rgba(255,255,255,0.72)',
         background: isActive ? 'rgba(255,255,255,0.1)' : hovered ? 'rgba(255,255,255,0.06)' : 'transparent',
-      })}
+      }}
     >
-      {({ isActive }) => (
-        <>
-          {isActive && (
-            <span style={{ position: 'absolute', left: -14, top: 8, bottom: 8, width: 3, borderRadius: '0 3px 3px 0', background: colors.steel }} />
-          )}
-          {Icon && <Icon size={18} color={isActive ? '#8DB6D6' : undefined} />}
-          {children}
-        </>
+      {isActive && (
+        <span style={{ position: 'absolute', left: -14, top: 8, bottom: 8, width: 3, borderRadius: '0 3px 3px 0', background: colors.steel }} />
       )}
-    </NavLink>
+      {Icon && <Icon size={18} color={isActive ? '#8DB6D6' : undefined} />}
+      {children}
+    </Link>
   );
 }
 
@@ -79,7 +79,7 @@ function SwitchChip({ m, current }) {
 /**
  * Shared layout for every module (PR, BID, RFQ, GNFA, PO).
  * module: entry from src/config/modules.js
- * nav:    array from the module's <code>.config.js → [{ label, path, icon, end? }]
+ * nav:    array from the module's <code>.config.js → [{ label, path, icon, end?, match?(pathname) }]
  */
 export default function ModuleLayout({ module, nav }) {
   const Icon = module.icon;
@@ -125,8 +125,8 @@ export default function ModuleLayout({ module, nav }) {
 
         <div style={sideLabel}>Menu</div>
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {nav.map(({ label, path, icon, end }) => (
-            <SideNavLink key={path} to={path} end={end} icon={icon}>{label}</SideNavLink>
+          {nav.map(({ label, path, icon, end, match }) => (
+            <SideNavLink key={path} to={path} end={end} match={match} icon={icon}>{label}</SideNavLink>
           ))}
         </nav>
 

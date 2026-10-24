@@ -31,7 +31,11 @@ export const colors = {
   textSecondary: '#667085',
   textDisabled: '#98A2B3',
   white: '#FFFFFF',
+  overlay: 'rgba(18, 48, 74, 0.45)',
 };
+
+/** Avatar / identity colours (theme colours only). */
+export const avatarPalette = ['#12304A', '#477DA5', '#273746', '#3478B8', '#778493'];
 
 /* ---------- Status colours ---------- */
 export const status = {

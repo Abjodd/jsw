@@ -31,40 +31,38 @@ src/
 │   ├── AppRoutes.jsx            # top-level routes, modules lazy-loaded
 │   └── ProtectedRoute.jsx
 ├── components/
-│   ├── ui/                      # ★ shared UI kit: Button, Card, KpiCard, StatusBadge, DataTable,
-│   │                            #   PageHeader, EmptyState, FormField, PageLoader
+│   ├── ui/                      # ★ shared UI kit — Button, IconButton, Card, KpiCard, StatusBadge, Tag,
+│   │                            #   Avatar, DataTable (select/sort/paging), FilterBar, BulkActionBar, QuickStats, Timeline,
+│   │                            #   Modal, Drawer, Toast, Tabs, Stepper, Input, Select, Textarea,
+│   │                            #   Checkbox, Toggle, Field, DescriptionList, PageHeader, EmptyState
 │   ├── layout/                  # TopBar, ModuleLayout (sidebar + topbar for every module)
 │   └── brand/JswLogo.jsx        # placeholder mark — replace with official logo asset
 ├── pages/
 │   ├── Login/                   # /login
 │   ├── Home/                    # /  — main app hub with module tiles
 │   └── NotFound/
-├── modules/                     # ★ one folder per module, identical structure
-│   ├── pr/    → /pr     Purchase Requisition
+├── modules/                     # ★ one folder per module
+│   ├── pr/    → /pr     Purchase Requisition  ✅ Admin + Buyer dashboards (see pr/README.md)
+│   ├── rfq/   → /rfq    Request for Quotation ✅ Dashboard, Create RFQ, Event detail (see rfq/README.md)
 │   ├── bid/   → /bid    Bid Management
-│   ├── rfq/   → /rfq    Request for Quotation
 │   ├── gnfa/  → /gnfa   GNFA
-│   └── po/    → /po     Purchase Orders
-├── utils/                       # apiClient.js, format.js (INR / dates)
+│   └── po/    → /po     Purchase Orders       ✅ Dashboard, PO detail, Create ASN, ASN register (see po/README.md)
+├── utils/                       # apiClient.js, format.js (INR / dates / CSV), createStore.js (mock state)
 └── assets/
 ```
 
-### Inside every module (example: `modules/pr/`)
+### Inside a placeholder module (example: `modules/gnfa/`)
 
 ```
-pr/
-├── PRModule.jsx        # routes for /pr/* (wrapped in shared ModuleLayout)
-├── pr.config.js        # sidebar menu items
-├── pages/              # one .jsx per screen — PASTE SCREEN CODE HERE
-│   ├── PROverview.jsx  # /pr  (module landing dashboard)
-│   ├── PRList.jsx      # /pr/list
-│   ├── PRCreate.jsx    # /pr/create
-│   ├── PRDetails.jsx   # /pr/details
-│   ├── PRApprovals.jsx # /pr/approvals
-│   └── PRReports.jsx   # /pr/reports
-├── components/         # module-only components
-├── hooks/              # module-only hooks
-├── services/prApi.js   # API calls
+gnfa/
+├── GNFAModule.jsx        # routes for /gnfa/* (wrapped in shared ModuleLayout)
+├── gnfa.config.js        # sidebar menu items
+├── pages/                # one .jsx per screen — PASTE SCREEN CODE HERE
+│   ├── GNFAOverview.jsx  # /gnfa  (module landing dashboard)
+│   └── …                 # /gnfa/requests, /gnfa/create, …
+├── components/           # module-only components
+├── hooks/                # module-only hooks
+├── services/gnfaApi.js   # API calls
 └── data/mockData.js    # demo data
 ```
 

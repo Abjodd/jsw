@@ -22,6 +22,11 @@ input::placeholder { color: ${colors.textDisabled}; }
 ::-webkit-scrollbar-thumb { background: #CBD3DB; border-radius: 10px; border: 2px solid ${colors.bgPage}; }
 @keyframes jsw-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes jsw-spin { to { transform: rotate(360deg); } }
+@keyframes jsw-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes jsw-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes jsw-slide-left { from { transform: translateX(32px); opacity: 0.4; } to { transform: none; opacity: 1; } }
+@keyframes jsw-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+input[type='number']::-webkit-inner-spin-button { opacity: 0.4; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 `;
 

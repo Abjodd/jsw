@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, ArrowDownRight, CalendarDays, Plus, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, ArrowUpRight, ArrowDownRight, CalendarDays, FilePlus2, Inbox } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { MODULES } from '@/config/modules';
 import TopBar from '@/components/layout/TopBar';
@@ -32,7 +32,6 @@ const s = {
   date: { ...text.caption, display: 'inline-flex', alignItems: 'center', gap: 6, color: 'rgba(255,255,255,0.65)' },
   title: { ...text.pageTitle, color: colors.white, margin: '8px 0 6px' },
   subtitle: { ...text.subtitle, color: 'rgba(255,255,255,0.72)' },
-  ghostBtn: { background: 'rgba(255,255,255,0.08)', borderColor: 'rgba(255,255,255,0.18)', color: colors.white },
   summary: (cols) => ({
     display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, marginTop: 28, transform: 'translateY(36px)',
     background: colors.bgCard, border: `1px solid ${colors.border}`, borderRadius: radius.lg, boxShadow: shadow.lg,
@@ -69,6 +68,7 @@ const pendingColumns = (isMobile) => [
 
 export default function HomeDashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useMediaQuery(bp.mobile);
   const isLaptop = useMediaQuery(bp.laptop);
   const firstName = user?.name?.split(' ')[0] ?? 'there';
@@ -93,8 +93,8 @@ export default function HomeDashboard() {
               </p>
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <Button variant="accent" icon={<Plus size={18} />}>New requisition</Button>
-              <Button variant="secondary" style={s.ghostBtn} icon={<Sparkles size={16} />}>Raise RFQ</Button>
+              <Button variant="accent" icon={<Inbox size={18} />} onClick={() => navigate('/pr/buyer')}>My PR queue</Button>
+              <Button variant="onDark" icon={<FilePlus2 size={16} />} onClick={() => navigate('/rfq/create')}>Create RFQ</Button>
             </div>
           </div>
 
