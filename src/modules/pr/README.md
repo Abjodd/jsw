@@ -1,28 +1,33 @@
 # PR — Purchase Requisition
 
-Route prefix: `/pr`
+Route prefix: `/pr` · Mock data only (no services wired yet).
+
+| Screen | Route | File |
+|---|---|---|
+| PR Admin Dashboard | `/pr` | `pages/PRAdminDashboard.jsx` |
+| PR Buyer Dashboard | `/pr/buyer` | `pages/PRBuyerDashboard.jsx` |
 
 ```
 pr/
-├── PRModule.jsx        # module routes (wrapped in shared ModuleLayout)
-├── pr.config.js          # sidebar navigation items
+├── PRModule.jsx                 # routes (wrapped in shared ModuleLayout)
+├── pr.config.js                 # sidebar menu
 ├── pages/
-│   ├── PROverview.jsx  # /pr
-│   ├── PRList.jsx            # /pr/list
-│   ├── PRCreate.jsx          # /pr/create
-│   ├── PRDetails.jsx         # /pr/details
-│   ├── PRApprovals.jsx       # /pr/approvals
-│   ├── PRReports.jsx         # /pr/reports
-├── components/          # module-only components
-├── hooks/               # module-only hooks
-├── services/prApi.js     # API calls
-└── data/mockData.js     # demo data (remove when APIs are live)
+│   ├── PRAdminDashboard.jsx     # assign / reassign buyer, change priority, send back
+│   └── PRBuyerDashboard.jsx     # create RFQ, repeat order, direct NFA, send back
+├── components/
+│   ├── PRTable.jsx              # compact line table (admin / buyer layouts)
+│   ├── PRDetailDrawer.jsx       # every SAP field, grouped + activity timeline
+│   ├── PriorityPill.jsx · BuyerCell.jsx · SelectedLines.jsx
+│   ├── PRActionModals.jsx       # picks the right modal
+│   └── modals/                  # AssignBuyer, ChangePriority, SendBack, RepeatOrder, DirectNfa
+├── hooks/usePRFilters.js        # filter panel + quick filter + search
+├── data/
+│   ├── mockData.js              # PR lines + buyers
+│   ├── prStore.js               # in-memory store + actions (swap for API calls)
+│   ├── constants.js             # option lists, status → colour
+│   └── exportColumns.js         # full 33-column CSV export
+└── services/prApi.js            # API stubs (not used yet)
 ```
 
-## Styling
-Inline styles only (`style={{ }}`), values from `@/theme/theme`. No `.css` files.
-
-## Adding a screen
-1. Create `pages/MyScreen.jsx`
-2. Add `{ label, path, icon }` to `pr.config.js`
-3. Add `<Route path="my-screen" element={<MyScreen />} />` in `PRModule.jsx`
+**Design notes:** the 33-column SAP grid is condensed into 8–10 readable columns; everything else lives in the
+detail drawer (click a row). Bulk actions appear in a floating bar when rows are selected. Download exports all columns.
