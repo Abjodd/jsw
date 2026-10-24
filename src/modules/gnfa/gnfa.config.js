@@ -1,16 +1,13 @@
 /**
  * GNFA MODULE — sidebar navigation.
- * Add a new screen: 1) create the page in ./pages  2) add it here  3) add a <Route> in GNFAModule.jsx
+ * Only two entries. GNFA Create Detail and the dashboard detail views live INSIDE the right panel
+ * (routes below these two items), so they are intentionally not listed here.
  */
-import { LayoutDashboard, ListChecks, FilePlus2, BadgeCheck, FileSearch, BarChart3 } from 'lucide-react';
+import { FilePlus2, LayoutDashboard } from 'lucide-react';
 
 export const BASE = '/gnfa';
 
 export const GNFA_NAV = [
-  { label: 'Overview', path: BASE, icon: LayoutDashboard, end: true },
-  { label: 'GNFA Requests', path: `${BASE}/requests`, icon: ListChecks },
-  { label: 'Create GNFA', path: `${BASE}/create`, icon: FilePlus2 },
-  { label: 'Approvals', path: `${BASE}/approvals`, icon: BadgeCheck },
-  { label: 'GNFA Details', path: `${BASE}/details`, icon: FileSearch },
-  { label: 'Reports', path: `${BASE}/reports`, icon: BarChart3 },
+  { label: 'GNFA Create', path: `${BASE}/create`, icon: FilePlus2 },
+  { label: 'GNFA Dashboard', path: `${BASE}/dashboard`, icon: LayoutDashboard },
 ];

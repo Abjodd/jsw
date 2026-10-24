@@ -1,0 +1,8 @@
+applications:
+  - name: jsw-dashboard
+    command: node server.js
+    memory: 128M
+    instances: 1
+    buildpacks:
+      - staticfile_buildpack
+    path: dist
