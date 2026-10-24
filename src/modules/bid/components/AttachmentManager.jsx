@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { ChevronDown, ChevronUp, Plus, Trash2, Upload, FileText } from 'lucide-react';
+import { Button, useToast } from '@/components/ui';
 import { colors, radius, text, transition } from '@/theme/theme';
 
 export default function AttachmentManager({
@@ -9,15 +9,10 @@ export default function AttachmentManager({
   bidAttachments = [],
   onChangeBidAttachments,
 }) {
+  const { toast } = useToast();
   const [prOpen, setPrOpen] = useState(true);
   const [rfqOpen, setRfqOpen] = useState(true);
   const [bidOpen, setBidOpen] = useState(true);
-  const [toastMessage, setToastMessage] = useState(null);
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   const handleAddRow = () => {
     const newRow = {
@@ -34,6 +29,7 @@ export default function AttachmentManager({
       sNo: idx + 1,
     }));
     onChangeBidAttachments(updated);
+    toast({ title: 'Row deleted', description: 'Attachment line removed.' });
   };
 
   const handleSpecChange = (index, value) => {
@@ -48,7 +44,7 @@ export default function AttachmentManager({
       const updated = [...bidAttachments];
       updated[index] = { ...updated[index], fileName: file.name };
       onChangeBidAttachments(updated);
-      showToast(`File '${file.name}' uploaded successfully!`);
+      toast({ title: 'File uploaded successfully', description: `Attached '${file.name}' to row #${index + 1}` });
     }
   };
 
@@ -99,32 +95,6 @@ export default function AttachmentManager({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18, position: 'relative' }}>
-      {/* Toast Alert */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 32,
-            right: 32,
-            background: colors.navy,
-            color: colors.white,
-            padding: '12px 20px',
-            borderRadius: radius.md,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            boxShadow: '0 8px 24px rgba(18, 48, 74, 0.25)',
-            zIndex: 9999,
-            ...text.caption,
-            fontSize: 13,
-            fontWeight: 500,
-          }}
-        >
-          <CheckCircle2 size={18} color="#23845B" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
       {/* 1. PR Attachments */}
       <div style={{ border: `1px solid ${colors.border}`, borderRadius: radius.md, overflow: 'hidden', background: colors.bgCard }}>
         {accordionHeader('PR Attachments', prAttachments.length, prOpen, () => setPrOpen(!prOpen))}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Download,
   Search,
@@ -8,11 +8,17 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  FileSpreadsheet,
+  ChevronLeft,
+  ChevronRight,
+  Trophy,
+  TrendingUp,
+  AlertTriangle,
+  MoveHorizontal,
 } from 'lucide-react';
-import { Card, PageHeader, Button } from '@/components/ui';
+import { Card, PageHeader, Button, QuickStats, useToast } from '@/components/ui';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { bp, colors, radius, rise, text, transition } from '@/theme/theme';
+import { downloadCSV } from '@/utils/format';
 import CircularStepTabs from '../components/CircularStepTabs';
 import { COMPARISON_DATA_MAP } from '../data/mockData';
 
@@ -23,35 +29,105 @@ const TABS = [
 ];
 
 export default function BidComparison() {
+  const { toast } = useToast();
   const isMobile = useMediaQuery(bp.mobile);
 
   const [searchEventId, setSearchEventId] = useState('10038');
   const [currentEventId, setCurrentEventId] = useState('10038');
   const [activeTab, setActiveTab] = useState('items');
   const [commercialTermsOpen, setCommercialTermsOpen] = useState(true);
-  const [exportNotice, setExportNotice] = useState(false);
+
+  // References for horizontal scrolling
+  const itemsTableRef = useRef(null);
+  const detailTableRef = useRef(null);
 
   const data = COMPARISON_DATA_MAP[currentEventId] || COMPARISON_DATA_MAP['10038'];
+
+  // Scroll helpers
+  const scrollTable = (ref, offset) => {
+    if (ref.current) {
+      ref.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  // Quick stats summary cards
+  const comparisonStats = [
+    {
+      key: 'l1',
+      label: 'Rank L1 (Lowest)',
+      value: `₹${data.summary.sixDegreesWithGst}`,
+      caption: 'SIX DEGREES BCW PVT LTD',
+      icon: Trophy,
+      tone: 'success',
+    },
+    {
+      key: 'l2',
+      label: 'Rank L2 (Runner up)',
+      value: `₹${data.summary.integratedWithGst}`,
+      caption: 'INTEGRATED SOLUTIONS',
+      icon: TrendingUp,
+      tone: 'navy',
+    },
+    {
+      key: 'variance',
+      label: 'Price Variance Gap',
+      value: `₹${data.summary.diffL1L2}`,
+      caption: 'Absolute difference (L1 vs L2)',
+      icon: Layers,
+      tone: 'error',
+    },
+    {
+      key: 'check10',
+      label: 'L1/L2 Gap > 10%?',
+      value: data.summary.isDiffMoreThan10Percent,
+      caption: 'Requires HOD Review / Justification',
+      icon: AlertTriangle,
+      tone: 'warning',
+    },
+  ];
 
   const handleSearch = () => {
     if (COMPARISON_DATA_MAP[searchEventId.trim()]) {
       setCurrentEventId(searchEventId.trim());
+      toast({ title: 'Event Loaded', description: `Showing bid comparison for Event #${searchEventId.trim()}` });
     } else {
       setCurrentEventId('10038');
+      toast({ title: 'Default Event Loaded', description: 'Showing Event #10038 comparison data.' });
     }
   };
 
   const handleClear = () => {
     setSearchEventId('');
+    toast({ title: 'Search Cleared', description: 'Event search input reset.' });
   };
 
   const handleDownload = () => {
-    setExportNotice(true);
-    setTimeout(() => setExportNotice(false), 3000);
+    downloadCSV(
+      `bid-comparison-matrix-${currentEventId}.csv`,
+      [
+        { label: 'Procurement Type', value: (r) => r.procurementType },
+        { label: 'Line Item', value: (r) => r.lineItem },
+        { label: 'Description', value: (r) => r.description },
+        { label: 'Quantity', value: (r) => r.quantity },
+        { label: 'UOM', value: (r) => r.uom },
+        { label: 'Delivery Location', value: (r) => r.deliveryLocation },
+        { label: 'Integrated Initial Quote', value: (r) => r.integratedInitial },
+        { label: 'Integrated Final Quote', value: (r) => r.integratedFinal },
+        { label: 'Six Degrees Initial Quote', value: (r) => r.sixDegreesInitial },
+        { label: 'Six Degrees Final Quote', value: (r) => r.sixDegreesFinal },
+        { label: 'Line Wise Lowest Vendor', value: (r) => r.lineWiseLowestVendor },
+        { label: 'Line Wise Lowest Final', value: (r) => r.lineWiseLowestFinal },
+        { label: 'Last PO Value', value: (r) => r.poValue },
+        { label: 'Last PO Date', value: (r) => r.poDate },
+        { label: 'Last Vendor Name', value: (r) => r.lastVendorName },
+      ],
+      data.items
+    );
+    toast({ title: 'Export Ready', description: `Bid Comparison Matrix for Event #${currentEventId} exported to CSV.` });
   };
 
   const thStyle = {
-    padding: '10px 12px',
+    padding: '10px 14px',
     background: colors.bgSubtle,
     color: colors.textSecondary,
     fontWeight: 600,
@@ -65,7 +141,7 @@ export default function BidComparison() {
   };
 
   const tdStyle = {
-    padding: '10px 12px',
+    padding: '12px 14px',
     borderBottom: `1px solid ${colors.border}`,
     borderRight: `1px solid ${colors.border}`,
     ...text.body,
@@ -77,18 +153,26 @@ export default function BidComparison() {
   const pillStyle = (bg, color) => ({
     background: bg,
     color,
-    padding: '3px 10px',
-    borderRadius: 999,
+    padding: '4px 12px',
+    borderRadius: 6,
     fontWeight: 600,
-    fontSize: 11,
+    fontSize: 12,
     display: 'inline-block',
     letterSpacing: '0.01em',
+    border: `1px solid ${color}33`,
   });
 
-  const summaryLabelStyle = {
-    ...text.caption,
-    fontWeight: 600,
-    color: colors.navy,
+  // Red badge for summary rows matching reference screenshot
+  const redSummaryBadgeStyle = {
+    background: '#D9383A',
+    color: '#FFFFFF',
+    padding: '5px 12px',
+    borderRadius: 6,
+    fontWeight: 700,
+    fontSize: 11,
+    display: 'inline-block',
+    boxShadow: '0 1px 3px rgba(217, 56, 58, 0.3)',
+    whiteSpace: 'nowrap',
   };
 
   return (
@@ -104,6 +188,9 @@ export default function BidComparison() {
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, ...rise(0) }}>
+        {/* Executive Comparison Summary KPI Cards */}
+        <QuickStats items={comparisonStats} active="l1" onChange={() => {}} />
+
         {/* Search & Filter Bar */}
         <Card>
           <div
@@ -148,33 +235,7 @@ export default function BidComparison() {
           </div>
         </Card>
 
-        {/* Export Toast */}
-        {exportNotice && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: 30,
-              right: 30,
-              background: colors.navy,
-              color: colors.white,
-              padding: '14px 22px',
-              borderRadius: radius.md,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              boxShadow: '0 8px 24px rgba(18,48,74,0.25)',
-              zIndex: 9999,
-              ...text.caption,
-              fontWeight: 500,
-              animation: 'jsw-rise 300ms ease',
-            }}
-          >
-            <FileSpreadsheet size={18} color="#23845B" />
-            <span>Bid Comparison exported to Excel successfully!</span>
-          </div>
-        )}
-
-        {/* Main Card */}
+        {/* Main Card with Stepper Tabs */}
         <Card flush style={rise(60)}>
           <CircularStepTabs tabs={TABS} activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -213,140 +274,274 @@ export default function BidComparison() {
               </div>
             )}
 
-            {/* ─── TAB 2: ITEMS SIDE-BY-SIDE ─── */}
+            {/* ─── TAB 2: ITEMS SIDE-BY-SIDE MATRIX COMPARISON ─── */}
             {activeTab === 'items' && (
               <div style={{ animation: 'jsw-slide-in 350ms ease' }}>
+                {/* Horizontal Scroll Navigation Toolbar */}
                 <div
-                  className="jsw-scroll-x"
-                  style={{ border: `1px solid ${colors.border}`, borderRadius: radius.md, overflow: 'hidden' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                    marginBottom: 12,
+                    padding: '8px 14px',
+                    background: colors.steel50,
+                    borderRadius: radius.md,
+                    border: `1px solid ${colors.border}`,
+                  }}
                 >
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 1600 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: colors.steel }}>
+                    <MoveHorizontal size={16} />
+                    <span style={{ ...text.caption, fontWeight: 600, color: colors.navy }}>
+                      Scrollable Comparison Matrix
+                    </span>
+                    <span style={{ ...text.caption, color: colors.textSecondary }}>
+                      (Drag scrollbar or use buttons to navigate all vendors, lowest bids, and PO details)
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<ChevronLeft size={16} />}
+                      onClick={() => scrollTable(itemsTableRef, -450)}
+                    >
+                      Scroll Left
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      iconRight={<ChevronRight size={16} />}
+                      onClick={() => scrollTable(itemsTableRef, 450)}
+                    >
+                      Scroll Right
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Wide Table with Guaranteed Free Scrolling */}
+                <div
+                  ref={itemsTableRef}
+                  className="table-scroll-container"
+                  style={{
+                    width: '100%',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: radius.md,
+                    background: colors.bgCard,
+                  }}
+                >
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 2100 }}>
                     <thead>
                       {/* Grouped vendor headers */}
                       <tr>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Procurement Type</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Line Item</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Description</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle', textAlign: 'right' }} rowSpan={2}>Quantity</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>UOM</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Delivery Location</th>
+                        {/* Base Line Item Columns */}
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 140 }} rowSpan={2}>Procurement Type</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 90 }} rowSpan={2}>Line Item</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', minWidth: 260 }} rowSpan={2}>Description</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', textAlign: 'right', width: 100 }} rowSpan={2}>Quantity</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 70 }} rowSpan={2}>UOM</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 160 }} rowSpan={2}>Delivery Location</th>
 
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#F0F9FF' }} colSpan={2}>
-                          <span style={pillStyle('#E0F2FE', '#0369A1')}>INTEGRATED SOLUTIONS</span>
+                        {/* Vendor 1 Column Header */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#F0F9FF',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={2}
+                        >
+                          <span style={pillStyle('#DCFCE7', '#15803D')}>
+                            INTEGRATED SOLUTIONS
+                          </span>
                         </th>
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#F0FDF4' }} colSpan={2}>
-                          <span style={pillStyle('#DCFCE7', '#15803D')}>SIX DEGREES BCW PVT LTD</span>
+
+                        {/* Vendor 2 Column Header */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#F0FDF4',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={2}
+                        >
+                          <span style={pillStyle('#DCFCE7', '#15803D')}>
+                            SIX DEGREES BCW PRIVATE LIMITED
+                          </span>
                         </th>
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#FEFCE8' }} colSpan={2}>
-                          <span style={pillStyle('#FEF9C3', '#854D0E')}>Line Wise Lowest</span>
+
+                        {/* Line Wise Lowest */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#FEFCE8',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={2}
+                        >
+                          <span style={pillStyle('#DCFCE7', '#15803D')}>
+                            Line Wise Lowest
+                          </span>
                         </th>
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#F8FAFC' }} colSpan={4}>
-                          <span style={pillStyle('#E2E8F0', '#475569')}>Last PO Detail</span>
+
+                        {/* PO Detail */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#F8FAFC',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={4}
+                        >
+                          <span style={pillStyle('#DCFCE7', '#15803D')}>
+                            PO Detail
+                          </span>
                         </th>
                       </tr>
+
                       {/* Sub-columns */}
                       <tr>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>Initial Quote</th>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>Final Quote</th>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>Initial Quote</th>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>Final Quote</th>
-                        <th style={{ ...thStyle, background: '#F8FAFC' }}>Vendor</th>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>Final Quote</th>
-                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC' }}>PO Value</th>
-                        <th style={{ ...thStyle, background: '#F8FAFC' }}>PO Date</th>
-                        <th style={{ ...thStyle, background: '#F8FAFC' }}>Vendor Name</th>
-                        <th style={{ ...thStyle, background: '#F8FAFC' }}>Del. Location</th>
+                        {/* Integrated Solutions */}
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 120 }}>Initial Quote</th>
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 120 }}>Final Quote</th>
+
+                        {/* Six Degrees */}
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 120 }}>Initial Quote</th>
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 120 }}>Final Quote</th>
+
+                        {/* Line Wise Lowest */}
+                        <th style={{ ...thStyle, background: '#F8FAFC', width: 220 }}>Vendor</th>
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 120 }}>Final Quote</th>
+
+                        {/* PO Detail */}
+                        <th style={{ ...thStyle, textAlign: 'right', background: '#F8FAFC', width: 130 }}>PO Value</th>
+                        <th style={{ ...thStyle, background: '#F8FAFC', width: 120 }}>PO Date</th>
+                        <th style={{ ...thStyle, background: '#F8FAFC', width: 220 }}>Vendor Name</th>
+                        <th style={{ ...thStyle, background: '#F8FAFC', width: 160 }}>Delivery Location</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {data.items.map((row, idx) => (
-                        <tr key={row.lineItem} style={{ animation: `jsw-rise 350ms ease both`, animationDelay: `${idx * 50}ms` }}>
+                      {/* Line Item Rows */}
+                      {data.items.map((row) => (
+                        <tr key={row.lineItem}>
                           <td style={tdStyle}>{row.procurementType}</td>
                           <td style={{ ...tdStyle, fontWeight: 600, color: colors.navy }}>{row.lineItem}</td>
-                          <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.description}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.quantity}</td>
+                          <td style={{ ...tdStyle, fontWeight: 500 }}>{row.description}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.quantity}</td>
                           <td style={tdStyle}>{row.uom}</td>
                           <td style={tdStyle}>{row.deliveryLocation}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integratedInitial}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.integratedFinal}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegreesInitial}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: '#15803D' }}>{row.sixDegreesFinal}</td>
+
+                          {/* Integrated Solutions */}
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integratedInitial}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{row.integratedFinal}</td>
+
+                          {/* Six Degrees */}
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegreesInitial}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: '#15803D', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegreesFinal}</td>
+
+                          {/* Line Wise Lowest */}
                           <td style={{ ...tdStyle, fontWeight: 500 }}>{row.lineWiseLowestVendor}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: '#15803D' }}>{row.lineWiseLowestFinal}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.poValue}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: '#15803D', fontVariantNumeric: 'tabular-nums' }}>
+                            {row.lineWiseLowestFinal}
+                          </td>
+
+                          {/* PO Detail */}
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.poValue}</td>
                           <td style={tdStyle}>{row.poDate}</td>
                           <td style={tdStyle}>{row.lastVendorName}</td>
                           <td style={tdStyle}>{row.lastDeliveryLocation}</td>
                         </tr>
                       ))}
 
-                      {/* ─── Summary Rows ─── */}
-                      {[
-                        {
-                          label: 'Total Price (Without GST)',
-                          intVal: data.summary.integratedWithoutGst,
-                          sixVal: data.summary.sixDegreesWithoutGst,
-                        },
-                        {
-                          label: 'Total Price (With GST)',
-                          intVal: data.summary.integratedWithGst,
-                          sixVal: data.summary.sixDegreesWithGst,
-                          highlight: true,
-                        },
-                      ].map((s) => (
-                        <tr key={s.label} style={{ background: colors.bgSubtle }}>
-                          <td style={tdStyle} colSpan={5} />
-                          <td style={{ ...tdStyle, ...summaryLabelStyle }}>{s.label}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: s.highlight ? colors.navy : undefined }}>{s.intVal}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: s.highlight ? '#23845B' : undefined }}>{s.sixVal}</td>
-                          <td style={tdStyle} colSpan={6} />
-                        </tr>
-                      ))}
-
-                      {/* Rank */}
+                      {/* Summary Row 1: Total Price(Without GST) */}
                       <tr style={{ background: colors.bgSubtle }}>
-                        <td style={tdStyle} colSpan={5} />
-                        <td style={{ ...tdStyle, ...summaryLabelStyle }}>Commercial Rank (with GST)</td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={pillStyle('#EEF4F9', colors.steel)}>{data.summary.integratedRank}</span>
+                        <td style={tdStyle} colSpan={5}></td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={redSummaryBadgeStyle}>Total Price(Without GST)</span>
                         </td>
                         <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
-                        <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={pillStyle('#E9F4EE', '#23845B')}>{data.summary.sixDegreesRank}</span>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {data.summary.integratedWithoutGst}
                         </td>
-                        <td style={tdStyle} colSpan={6} />
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                          {data.summary.sixDegreesWithoutGst}
+                        </td>
+                        <td style={tdStyle} colSpan={6}></td>
                       </tr>
 
-                      {/* Difference */}
+                      {/* Summary Row 2: Total Price(With GST) */}
                       <tr style={{ background: colors.bgSubtle }}>
-                        <td style={tdStyle} colSpan={5} />
-                        <td style={{ ...tdStyle, ...summaryLabelStyle }}>Difference (L1 & L2 final quotes)</td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }} colSpan={2}>
-                          <strong style={{ color: colors.navy, fontSize: 13 }}>{data.summary.diffL1L2}</strong>
+                        <td style={tdStyle} colSpan={5}></td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={redSummaryBadgeStyle}>Total Price(With GST)</span>
                         </td>
-                        <td style={tdStyle} colSpan={8} />
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: colors.navy, fontVariantNumeric: 'tabular-nums' }}>
+                          {data.summary.integratedWithGst}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#23845B', fontVariantNumeric: 'tabular-nums' }}>
+                          {data.summary.sixDegreesWithGst}
+                        </td>
+                        <td style={tdStyle} colSpan={6}></td>
                       </tr>
 
-                      {/* >10% check */}
+                      {/* Summary Row 3: Commercial Rank(with GST) */}
                       <tr style={{ background: colors.bgSubtle }}>
-                        <td style={tdStyle} colSpan={5} />
-                        <td style={{ ...tdStyle, ...summaryLabelStyle }}>Is L1–L2 difference &gt; 10%?</td>
-                        <td style={{ ...tdStyle, textAlign: 'right' }} colSpan={2}>
-                          <span style={pillStyle(data.summary.isDiffMoreThan10Percent === 'YES' ? '#FAECEC' : '#E9F4EE', data.summary.isDiffMoreThan10Percent === 'YES' ? '#C44747' : '#23845B')}>
-                            {data.summary.isDiffMoreThan10Percent}
-                          </span>
+                        <td style={tdStyle} colSpan={5}></td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={redSummaryBadgeStyle}>Commercial Rank(with GST)</span>
                         </td>
-                        <td style={tdStyle} colSpan={8} />
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700 }}>
+                          {data.summary.integratedRank}
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#23845B' }}>
+                          {data.summary.sixDegreesRank}
+                        </td>
+                        <td style={tdStyle} colSpan={6}></td>
+                      </tr>
+
+                      {/* Summary Row 4: Difference between final quotes of L1 L2 */}
+                      <tr style={{ background: colors.bgSubtle }}>
+                        <td style={tdStyle} colSpan={5}></td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={redSummaryBadgeStyle}>Difference between final quotes of L1 L2</span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: colors.navy, fontVariantNumeric: 'tabular-nums' }}>
+                          {data.summary.diffL1L2}
+                        </td>
+                        <td style={tdStyle} colSpan={8}></td>
+                      </tr>
+
+                      {/* Summary Row 5: Is difference between L1 & L2 more than 10%? */}
+                      <tr style={{ background: colors.bgSubtle }}>
+                        <td style={tdStyle} colSpan={5}></td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={redSummaryBadgeStyle}>Is difference between L1 & L2 more than 10%?</span>
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>—</td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#C44747' }}>
+                          {data.summary.isDiffMoreThan10Percent}
+                        </td>
+                        <td style={tdStyle} colSpan={8}></td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
 
-                {/* Commercial Terms Comparison */}
+                {/* Commercial Terms Comparison Accordion */}
                 <div
                   style={{
                     border: `1px solid ${colors.border}`,
@@ -379,18 +574,18 @@ export default function BidComparison() {
                       <span style={{ ...text.cardTitle, fontSize: 15, color: colors.navy }}>Commercial Terms Comparison</span>
                     </div>
                     <span style={{ ...text.caption, color: colors.textSecondary }}>
-                      {data.commercialTermsComparison.length} clauses
+                      {data.commercialTermsComparison.length} standard clauses evaluated
                     </span>
                   </button>
 
                   {commercialTermsOpen && (
-                    <div className="jsw-scroll-x" style={{ animation: 'jsw-fade-in 250ms ease' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+                    <div className="table-scroll-container">
+                      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850 }}>
                         <thead>
                           <tr style={{ background: colors.bgSubtle }}>
                             <th style={{ ...thStyle, width: '25%' }}>Commercial Terms</th>
                             <th style={{ ...thStyle, width: '25%' }}>Azure Power Standard</th>
-                            <th style={{ ...thStyle, width: '25%' }}>SIX DEGREES BCW PVT...</th>
+                            <th style={{ ...thStyle, width: '25%' }}>SIX DEGREES BCW PRIVATE...</th>
                             <th style={{ ...thStyle, width: '25%' }}>INTEGRATED SOLUTIONS</th>
                           </tr>
                         </thead>
@@ -400,7 +595,7 @@ export default function BidComparison() {
                               <td style={{ ...tdStyle, fontWeight: 500 }}>{row.term}</td>
                               <td style={{ ...tdStyle, color: colors.textSecondary }}>
                                 {row.term === 'GCC Terms' ? (
-                                  <a href="#gcc" style={{ color: colors.steel, textDecoration: 'underline' }}>{row.azure}</a>
+                                  <a href="#gcc" style={{ color: colors.steel, textDecoration: 'underline', fontWeight: 600 }}>{row.azure}</a>
                                 ) : row.azure}
                               </td>
                               <td style={{ ...tdStyle, color: '#23845B', fontWeight: 500 }}>{row.sixDegrees}</td>
@@ -415,87 +610,176 @@ export default function BidComparison() {
               </div>
             )}
 
-            {/* ─── TAB 3: DETAIL COMPARISON ─── */}
+            {/* ─── TAB 3: DETAIL COMPARISON (ITEMIZED COST BREAKDOWN ACROSS VENDORS) ─── */}
             {activeTab === 'detail' && (
               <div style={{ animation: 'jsw-slide-in 350ms ease' }}>
+                {/* Horizontal Scroll Navigation Toolbar */}
                 <div
-                  className="jsw-scroll-x"
-                  style={{ border: `1px solid ${colors.border}`, borderRadius: radius.md, overflow: 'hidden' }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                    marginBottom: 12,
+                    padding: '8px 14px',
+                    background: colors.steel50,
+                    borderRadius: radius.md,
+                    border: `1px solid ${colors.border}`,
+                  }}
                 >
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 1800 }}>
-                    <thead>
-                      <tr>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>RFQ ID</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>RFQ Line</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>PR Number</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>PR Line</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Material Code</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Material Description</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle', textAlign: 'right' }} rowSpan={2}>RFQ Qty</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>UoM</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Plant Code</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Plant Address</th>
-                        <th style={{ ...thStyle, verticalAlign: 'middle' }} rowSpan={2}>Tax Code</th>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: colors.steel }}>
+                    <MoveHorizontal size={16} />
+                    <span style={{ ...text.caption, fontWeight: 600, color: colors.navy }}>
+                      Full Detailed Breakdown Across All Vendors
+                    </span>
+                    <span style={{ ...text.caption, color: colors.textSecondary }}>
+                      (Includes Unit Price, Freight, P&F, Discounts, Basic Amount, Taxes & Totals)
+                    </span>
+                  </div>
 
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#F0FDF4' }} colSpan={7}>
-                          <span style={{ fontWeight: 700, color: '#15803D' }}>SIX DEGREES BCW PVT LTD (R01)</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<ChevronLeft size={16} />}
+                      onClick={() => scrollTable(detailTableRef, -500)}
+                    >
+                      Scroll Left
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      iconRight={<ChevronRight size={16} />}
+                      onClick={() => scrollTable(detailTableRef, 500)}
+                    >
+                      Scroll Right
+                    </Button>
+                  </div>
+                </div>
+
+                <div
+                  ref={detailTableRef}
+                  className="table-scroll-container"
+                  style={{
+                    width: '100%',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: radius.md,
+                    background: colors.bgCard,
+                  }}
+                >
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 2400 }}>
+                    <thead>
+                      {/* Top level headers */}
+                      <tr>
+                        {/* Base Columns */}
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 140 }} rowSpan={2}>RFQ ID</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 110 }} rowSpan={2}>RFQ Line Item</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 120 }} rowSpan={2}>PR Number</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 110 }} rowSpan={2}>PR Line Item</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 120 }} rowSpan={2}>Material Code</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', minWidth: 240 }} rowSpan={2}>Material Description</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', textAlign: 'right', width: 90 }} rowSpan={2}>RFQ Qty</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 70 }} rowSpan={2}>UoM</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 90 }} rowSpan={2}>Plant Code</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 140 }} rowSpan={2}>Plant Address</th>
+                        <th style={{ ...thStyle, verticalAlign: 'middle', width: 90 }} rowSpan={2}>Tax Code</th>
+
+                        {/* SIX DEGREES Group Header */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#F0FDF4',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={7}
+                        >
+                          <div style={{ fontWeight: 700, color: '#15803D', fontSize: 13 }}>
+                            SIX DEGREES BCW PRIVATE LIMITED
+                          </div>
+                          <div style={{ ...text.caption, color: colors.textSecondary, marginTop: 2 }}>
+                            Round R01
+                          </div>
                         </th>
-                        <th style={{ ...thStyle, textAlign: 'center', background: '#F0F9FF' }} colSpan={7}>
-                          <span style={{ fontWeight: 700, color: '#0369A1' }}>INTEGRATED SOLUTIONS (R01)</span>
+
+                        {/* INTEGRATED SOLUTIONS Group Header */}
+                        <th
+                          style={{
+                            ...thStyle,
+                            textAlign: 'center',
+                            background: '#F0F9FF',
+                            borderBottom: `1px solid ${colors.border}`,
+                          }}
+                          colSpan={7}
+                        >
+                          <div style={{ fontWeight: 700, color: '#0369A1', fontSize: 13 }}>
+                            INTEGRATED SOLUTIONS
+                          </div>
+                          <div style={{ ...text.caption, color: colors.textSecondary, marginTop: 2 }}>
+                            Round R01
+                          </div>
                         </th>
                       </tr>
+
+                      {/* Sub-header columns */}
                       <tr>
-                        {/* Six Degrees sub-cols */}
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Unit Price</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Freight</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>P & F</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Disc.(%)</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Basic Amt</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Tax Amt</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Total Amt</th>
-                        {/* Integrated sub-cols */}
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Unit Price</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Freight</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>P & F</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Disc.(%)</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Basic Amt</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Tax Amt</th>
-                        <th style={{ ...thStyle, textAlign: 'right' }}>Total Amt</th>
+                        {/* Six Degrees */}
+                        <th style={{ ...thStyle, textAlign: 'right', width: 100 }}>Unit Price</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 130 }}>Freight & Insurance</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 130 }}>Packing & Forwarding</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 100 }}>Discount (%)</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Basic Amount</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Tax Amount</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>Total Amount</th>
+
+                        {/* Integrated Solutions */}
+                        <th style={{ ...thStyle, textAlign: 'right', width: 100 }}>Unit Price</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 130 }}>Freight & Insurance</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 130 }}>Packing & Forwarding</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 100 }}>Discount (%)</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Basic Amount</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 110 }}>Tax Amount</th>
+                        <th style={{ ...thStyle, textAlign: 'right', width: 120 }}>Total Amount</th>
                       </tr>
                     </thead>
 
                     <tbody>
-                      {data.detailComparisonRows.map((row, idx) => (
-                        <tr key={row.rfqLineItem} style={{ animation: `jsw-rise 350ms ease both`, animationDelay: `${idx * 50}ms` }}>
+                      {data.detailComparisonRows.map((row) => (
+                        <tr key={row.rfqLineItem}>
                           <td style={tdStyle}>{row.rfqId}</td>
                           <td style={{ ...tdStyle, fontWeight: 600, color: colors.navy }}>{row.rfqLineItem}</td>
                           <td style={tdStyle}>{row.prNumber}</td>
                           <td style={tdStyle}>{row.prLineItem}</td>
                           <td style={tdStyle}>{row.materialCode}</td>
-                          <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis' }}>{row.materialDescription}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.rfqQty}</td>
+                          <td style={{ ...tdStyle, fontWeight: 500 }}>{row.materialDescription}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.rfqQty}</td>
                           <td style={tdStyle}>{row.uom}</td>
                           <td style={tdStyle}>{row.plantCode}</td>
                           <td style={tdStyle}>{row.plantAddress}</td>
-                          <td style={{ ...tdStyle, fontWeight: 600 }}>{row.taxCode}</td>
+                          <td style={{ ...tdStyle, fontWeight: 600, color: colors.navy }}>{row.taxCode}</td>
 
                           {/* Six Degrees */}
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegrees.unitPrice}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegrees.freight}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegrees.packing}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegrees.discount}%</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.sixDegrees.basicAmount}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.sixDegrees.taxAmount}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#15803D' }}>{row.sixDegrees.totalAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.unitPrice}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.freight}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.packing}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.discount}%</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.basicAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.sixDegrees.taxAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#15803D', fontVariantNumeric: 'tabular-nums' }}>
+                            {row.sixDegrees.totalAmount}
+                          </td>
 
                           {/* Integrated */}
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integrated.unitPrice}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integrated.freight}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integrated.packing}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integrated.discount}%</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{row.integrated.basicAmount}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right' }}>{row.integrated.taxAmount}</td>
-                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#0369A1' }}>{row.integrated.totalAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integrated.unitPrice}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integrated.freight}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integrated.packing}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integrated.discount}%</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{row.integrated.basicAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{row.integrated.taxAmount}</td>
+                          <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 700, color: '#0369A1', fontVariantNumeric: 'tabular-nums' }}>
+                            {row.integrated.totalAmount}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

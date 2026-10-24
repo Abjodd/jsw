@@ -28,11 +28,38 @@ input::placeholder { color: ${colors.textDisabled}; }
 
 /* Smooth horizontal scroll containers */
 .jsw-scroll-x {
-  overflow-x: auto;
+  overflow-x: auto !important;
+  overflow-y: visible !important;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
   scrollbar-width: thin;
   scrollbar-color: #CBD3DB transparent;
+}
+
+/* Dedicated prominent scrollbar for wide comparison tables */
+.table-scroll-container {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+  scrollbar-width: auto;
+  scrollbar-color: #477DA5 #EEF4F9;
+  position: relative;
+}
+.table-scroll-container::-webkit-scrollbar {
+  height: 12px !important;
+}
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #EEF4F9 !important;
+  border-radius: 6px;
+}
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #477DA5 !important;
+  border-radius: 6px;
+  border: 2px solid #EEF4F9;
+}
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #12304A !important;
 }
 
 /* Rise entrance animation */
@@ -55,13 +82,6 @@ input::placeholder { color: ${colors.textDisabled}; }
 
 /* Spinner */
 @keyframes jsw-spin { to { transform: rotate(360deg); } }
-
-/* Modals, drawers, toasts, live indicators */
-@keyframes jsw-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes jsw-pop { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
-@keyframes jsw-slide-left { from { transform: translateX(32px); opacity: 0.4; } to { transform: none; opacity: 1; } }
-@keyframes jsw-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-input[type='number']::-webkit-inner-spin-button { opacity: 0.4; }
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

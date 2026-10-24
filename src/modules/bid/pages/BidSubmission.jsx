@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Clock,
   CheckCircle,
@@ -12,10 +12,15 @@ import {
   List,
   Paperclip,
   Check,
+  Download,
+  Layers,
+  UserCheck,
+  Calculator,
 } from 'lucide-react';
-import { Card, PageHeader, Button, StatusBadge } from '@/components/ui';
+import { Card, PageHeader, Button, StatusBadge, QuickStats, useToast } from '@/components/ui';
 import useMediaQuery from '@/hooks/useMediaQuery';
 import { bp, colors, radius, rise, text, transition } from '@/theme/theme';
+import { downloadCSV, formatINR } from '@/utils/format';
 import CircularStepTabs from '../components/CircularStepTabs';
 import AddCostModal from '../components/AddCostModal';
 import CommercialTermsTable from '../components/CommercialTermsTable';
@@ -30,12 +35,16 @@ const TABS = [
 ];
 
 export default function BidSubmission() {
+  const { toast } = useToast();
   const isMobile = useMediaQuery(bp.mobile);
   const isTablet = useMediaQuery(bp.tablet);
 
   // Navigation state: 'list' (dashboard) vs 'detail' (quotation entry)
   const [viewMode, setViewMode] = useState('list');
   const [selectedEventId, setSelectedEventId] = useState('0000010039');
+
+  // Quick filter state
+  const [quickFilter, setQuickFilter] = useState('all');
 
   // Filter state for List view
   const [filterEventId, setFilterEventId] = useState('');
@@ -56,13 +65,29 @@ export default function BidSubmission() {
   const [declineModalOpen, setDeclineModalOpen] = useState(false);
 
   // Filter logic
-  const filteredEvents = BID_SUBMISSION_EVENTS.filter((ev) => {
-    if (filterEventId && !ev.eventNo.toLowerCase().includes(filterEventId.toLowerCase())) return false;
-    if (filterRfqNumber && !ev.rfqId.toLowerCase().includes(filterRfqNumber.toLowerCase())) return false;
-    if (filterBuyer && !ev.buyer.toLowerCase().includes(filterBuyer.toLowerCase())) return false;
-    if (filterStatus !== 'All' && ev.status !== filterStatus) return false;
-    return true;
-  });
+  const filteredEvents = useMemo(() => {
+    return BID_SUBMISSION_EVENTS.filter((ev) => {
+      // Quick filter
+      if (quickFilter === 'open' && ev.status !== 'Open') return false;
+      if (quickFilter === 'quoted' && ev.status !== 'Quoted') return false;
+      if (quickFilter === 'deepak' && !ev.buyer.includes('Deepak')) return false;
+
+      // Inputs
+      if (filterEventId && !ev.eventNo.toLowerCase().includes(filterEventId.toLowerCase())) return false;
+      if (filterRfqNumber && !ev.rfqId.toLowerCase().includes(filterRfqNumber.toLowerCase())) return false;
+      if (filterBuyer && !ev.buyer.toLowerCase().includes(filterBuyer.toLowerCase())) return false;
+      if (filterStatus !== 'All' && ev.status !== filterStatus) return false;
+      return true;
+    });
+  }, [quickFilter, filterEventId, filterRfqNumber, filterBuyer, filterStatus]);
+
+  // QuickStats metadata matching PR & PO dashboard style
+  const quickStatsItems = [
+    { key: 'all', label: 'All Bid Events', value: String(BID_SUBMISSION_EVENTS.length), caption: 'Total supplier RFQs', icon: Layers, tone: 'navy' },
+    { key: 'open', label: 'Open for Bidding', value: String(BID_SUBMISSION_EVENTS.filter((e) => e.status === 'Open').length), caption: 'Requires quotation', icon: Clock, tone: 'progress' },
+    { key: 'quoted', label: 'Quoted Events', value: String(BID_SUBMISSION_EVENTS.filter((e) => e.status === 'Quoted').length), caption: 'Submitted to buyers', icon: CheckCircle, tone: 'success' },
+    { key: 'deepak', label: 'Buyer: Deepak Jha', value: String(BID_SUBMISSION_EVENTS.filter((e) => e.buyer.includes('Deepak')).length), caption: 'O&M Services desk', icon: UserCheck, tone: 'warning' },
+  ];
 
   const handleClearFilters = () => {
     setFilterEventId('');
@@ -71,6 +96,8 @@ export default function BidSubmission() {
     setFilterEndDate('');
     setFilterBuyer('');
     setFilterStatus('All');
+    setQuickFilter('all');
+    toast({ title: 'Filters reset', description: 'Showing all bid submission events.' });
   };
 
   const handleOpenDetail = (eventNo) => {
@@ -84,6 +111,7 @@ export default function BidSubmission() {
       ...prev,
       items: prev.items.map((it) => (it.id === updatedItem.id ? updatedItem : it)),
     }));
+    toast({ title: 'Cost updated', description: `Line item ${updatedItem.rfqLineItem} price recalculated.` });
   };
 
   const handleDeliveryDaysChange = (itemId, val) => {
@@ -99,6 +127,32 @@ export default function BidSubmission() {
       gccTerms: { ...prev.gccTerms, [field]: val },
     }));
   };
+
+  const handleExportEvents = () => {
+    downloadCSV(
+      'bid-submission-events.csv',
+      [
+        { label: 'Event No', value: (r) => r.eventNo },
+        { label: 'RFQ ID', value: (r) => r.rfqId },
+        { label: 'Quotation ID', value: (r) => r.quotationId },
+        { label: 'Start Date', value: (r) => r.rfqStartDateTime },
+        { label: 'End Date', value: (r) => r.rfqEndDateTime },
+        { label: 'Buyer', value: (r) => r.buyer },
+        { label: 'Status', value: (r) => r.status },
+        { label: 'Bid Extension', value: (r) => r.bidPeriodExtension },
+      ],
+      filteredEvents
+    );
+    toast({ title: 'Export ready', description: `${filteredEvents.length} events exported to CSV.` });
+  };
+
+  // Quotation metrics summary
+  const quoteSummary = useMemo(() => {
+    const basic = submissionData.items.reduce((s, it) => s + (it.unitPrice || 0) * (it.rfqQty || 1), 0);
+    const tax = submissionData.items.reduce((s, it) => s + (it.taxAmount || 0), 0);
+    const total = submissionData.items.reduce((s, it) => s + (it.totalWithTaxAmount || 0), 0);
+    return { basic, tax, total };
+  }, [submissionData.items]);
 
   const inputStyle = {
     width: '100%',
@@ -149,7 +203,11 @@ export default function BidSubmission() {
             : `Event #${selectedEventId} — ${submissionData.rfqSubject}`
         }
         actions={
-          viewMode === 'detail' && (
+          viewMode === 'list' ? (
+            <Button variant="secondary" icon={<Download size={16} />} onClick={handleExportEvents}>
+              Download
+            </Button>
+          ) : (
             <Button
               variant="secondary"
               icon={<ArrowLeft size={16} />}
@@ -166,6 +224,13 @@ export default function BidSubmission() {
       {/* ========================================================================= */}
       {viewMode === 'list' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, ...rise(0) }}>
+          {/* QuickStats Cards - unified with PR & PO modules */}
+          <QuickStats
+            items={quickStatsItems}
+            active={quickFilter}
+            onChange={(key) => setQuickFilter(key)}
+          />
+
           {/* Filters Card */}
           <Card>
             <div
@@ -405,6 +470,29 @@ export default function BidSubmission() {
               {/* TAB 1: ITEMS */}
               {activeTab === 'items' && (
                 <div>
+                  {/* Executive Metric Cards for Quotation Values */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+                      gap: 14,
+                      marginBottom: 20,
+                    }}
+                  >
+                    <div style={{ background: colors.steel50, padding: '14px 18px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}>
+                      <span style={{ ...text.caption, color: colors.textSecondary }}>Basic Order Value</span>
+                      <p style={{ ...text.cardTitle, color: colors.navy, margin: '4px 0 0' }}>{formatINR(quoteSummary.basic, 2)}</p>
+                    </div>
+                    <div style={{ background: colors.steel50, padding: '14px 18px', borderRadius: radius.md, border: `1px solid ${colors.border}` }}>
+                      <span style={{ ...text.caption, color: colors.textSecondary }}>Calculated Tax Amount</span>
+                      <p style={{ ...text.cardTitle, color: colors.steel, margin: '4px 0 0' }}>{formatINR(quoteSummary.tax, 2)}</p>
+                    </div>
+                    <div style={{ background: '#E9F4EE', padding: '14px 18px', borderRadius: radius.md, border: '1px solid #C4E3D2' }}>
+                      <span style={{ ...text.caption, color: '#23845B', fontWeight: 600 }}>Total Quotation with Tax</span>
+                      <p style={{ ...text.cardTitle, color: '#23845B', fontWeight: 700, margin: '4px 0 0' }}>{formatINR(quoteSummary.total, 2)}</p>
+                    </div>
+                  </div>
+
                   <div
                     style={{
                       display: 'flex',
@@ -424,7 +512,7 @@ export default function BidSubmission() {
                       Add Cost
                     </Button>
                     <span style={{ ...text.caption, color: colors.textSecondary }}>
-                      Select a row and click "Add Cost" to configure pricing.
+                      Select a row and click "Add Cost" to configure taxes, freight and pricing.
                     </span>
                   </div>
 
@@ -715,7 +803,11 @@ export default function BidSubmission() {
             <Button
               variant="primary"
               block
-              onClick={() => { setSubmitSuccessModal(false); setViewMode('list'); }}
+              onClick={() => {
+                setSubmitSuccessModal(false);
+                setViewMode('list');
+                toast({ title: 'Quotation submitted', description: `Quotation for Event #${selectedEventId} is recorded.` });
+              }}
             >
               OK
             </Button>
@@ -768,7 +860,11 @@ export default function BidSubmission() {
                 variant="primary"
                 block
                 style={{ background: '#C44747', borderColor: '#C44747' }}
-                onClick={() => { setDeclineModalOpen(false); setViewMode('list'); }}
+                onClick={() => {
+                  setDeclineModalOpen(false);
+                  setViewMode('list');
+                  toast({ title: 'RFQ Declined', description: `Declined participation for Event #${selectedEventId}.` });
+                }}
               >
                 Yes, Decline
               </Button>
